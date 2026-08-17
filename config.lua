@@ -32,9 +32,8 @@ Config.Inventory = 'auto'
 -- Ten item phai trung khop voi item trong file items cua he thong tui do dang dung
 -- =====================================================================
 Config.Items = {
-    ['vespa2'] = 'vespa2',
-    ['aventadorsvj63']   = 'aventadorsvj63',
-    ['raptor2017']   = 'raptor2017',
+    ['car_elegy'] = 'elegy',
+    ['car_t20']   = 't20',
 }
 
 -- =====================================================================
