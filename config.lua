@@ -32,8 +32,7 @@ Config.Inventory = 'auto'
 -- Ten item phai trung khop voi item trong file items cua he thong tui do dang dung
 -- =====================================================================
 Config.Items = {
-    ['car_elegy'] = 'elegy',
-    ['car_t20']   = 't20',
+    ['car_pcj'] = 'pcj',
 }
 
 -- =====================================================================
@@ -89,6 +88,17 @@ Config.BlockInInterior = true
 -- Voi QBCore, neu QBCore.Functions.GeneratePlate ton tai thi se uu tien dung ham do,
 -- neu khong se dung bo sinh bien so noi bo theo format nay.
 Config.PlateFormat = '11AAA111'
+
+-- =====================================================================
+-- XANG KHI SPAWN
+-- =====================================================================
+-- Muc xang khi xe duoc tao (0 - 100)
+Config.SpawnFuel = 100
+
+-- Script xang dang dung tren server:
+-- 'auto' = tu nhan dien (ox_fuel, lc_fuel, LegacyFuel, cdn-fuel, ps-fuel, lj-fuel, qb-fuel, okokGasStation)
+-- Hoac dat cung ten resource, vd: 'lc_fuel'
+Config.FuelResource = 'auto'
 
 -- =====================================================================
 -- GARAGE MAC DINH (chi dung cho framework 'qb' khi insert vao player_vehicles)

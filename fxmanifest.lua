@@ -3,7 +3,7 @@ game 'gta5'
 
 author 'S82 Studio'
 description 'S82Studio - Vehicle Item | Ho tro ESX / QBCore / QBox | Da inventory | Da ngon ngu'
-version '3.0.0'
+version '3.0.1'
 
 -- =====================================================================
 -- LUU Y: Resource nay can ox_lib (dung cho progressBar, alertDialog,

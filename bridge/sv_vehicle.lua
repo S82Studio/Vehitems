@@ -18,38 +18,85 @@ Bridge.Vehicle = {}
 -- Spawn hoan toan phia server (CreateVehicleServerSetter) - khong can
 -- client tro ve network id, tranh phu thuoc vao module rieng cua tung fw
 -- =====================================================================
-local function spawnVehicleServerSide(src, model, spawnPos, plate)
-    local hash = GetHashKey(model)
-    RequestModel(hash)
+-- LUU Y: Server KHONG co RequestModel / HasModelLoaded / SetVehicleFuelLevel /
+-- SetVehicleEngineOn / SetVehRadioStation... (chi co o client). Vi vay:
+--   1) Hoi client loai xe (automobile / bike / heli...) qua lib.callback
+--      -> client tu load model + tra ve type (cache lai theo model)
+--   2) Server tao entity bang CreateVehicleServerSetter voi dung type
+--   3) Gui netId ve client de set fuel / may / radio (native client-only)
+local VehicleTypeCache = {}
 
+local function getVehicleType(src, model)
+    if VehicleTypeCache[model] then
+        return VehicleTypeCache[model]
+    end
+
+    local vType = lib.callback.await('s82_vehitems:client:getVehicleType', src, model)
+    if vType then
+        VehicleTypeCache[model] = vType
+    end
+    return vType
+end
+
+local function spawnVehicleServerSide(src, model, spawnPos, plate)
+    local hash = joaat(model)
+
+    local vType = getVehicleType(src, model)
+    if not vType then
+        return nil, 'model_invalid'
+    end
+
+    local vehicle = CreateVehicleServerSetter(hash, vType, spawnPos.x, spawnPos.y, spawnPos.z, spawnPos.w)
+
+    -- Cho entity ton tai (toi da ~2s)
     local attempts = 0
-    while not HasModelLoaded(hash) and attempts < 200 do
+    while (not vehicle or vehicle == 0 or not DoesEntityExist(vehicle)) and attempts < 200 do
         Wait(10)
         attempts = attempts + 1
     end
-
-    if not HasModelLoaded(hash) then
-        return nil, 'model_load_failed'
-    end
-
-    local vehicle = CreateVehicleServerSetter(hash, 'automobile', spawnPos.x, spawnPos.y, spawnPos.z, spawnPos.w)
-    SetModelAsNoLongerNeeded(hash)
 
     if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then
         return nil, 'spawn_failed'
     end
 
+    -- Native server-side hop le
     SetVehicleNumberPlateText(vehicle, plate)
-    SetVehicleDirtLevel(vehicle, 0.0)
-    SetVehicleFuelLevel(vehicle, 100.0)
-    SetVehicleEngineOn(vehicle, true, true, false)
-    SetVehicleNeedsToBeHotwired(vehicle, false)
-    SetVehRadioStation(vehicle, 'OFF')
+    local fuel = (Config.SpawnFuel or 100) + 0.0
+    Entity(vehicle).state:set('fuel', fuel, true) -- ox_fuel / cac fuel script doc statebag nay
 
+    -- Warp player vao ghe lai (lap lai den khi thanh cong, toi da ~3s)
     local ped = GetPlayerPed(src)
     if ped and ped ~= 0 then
-        Wait(150)
-        TaskWarpPedIntoVehicle(ped, vehicle, -1)
+        local tries = 0
+        while GetVehiclePedIsIn(ped, false) ~= vehicle and tries < 60 do
+            TaskWarpPedIntoVehicle(ped, vehicle, -1)
+            Wait(50)
+            tries = tries + 1
+        end
+    end
+
+    -- Cho entity co owner (client da nhan entity) truoc khi lam gi tiep
+    local ownerTries = 0
+    while NetworkGetEntityOwner(vehicle) == -1 and ownerTries < 100 do
+        Wait(20)
+        ownerTries = ownerTries + 1
+    end
+
+    -- Client setup (fuel / bien so / may...) va CHO client xac nhan xong.
+    -- Nho vay khi ham nay tra ve, xe da sync day du -> GiveKeys / fuel khong bi "som".
+    local netId = NetworkGetNetworkIdFromEntity(vehicle)
+    local ok = lib.callback.await('s82_vehitems:client:setupVehicle', src, netId, plate, fuel)
+    if not ok and Config.Debug then
+        print(('[s82_vehitems] WARN: client setup xe chua xac nhan (netId=%s)'):format(netId))
+    end
+
+    -- Cho bien so phia server khop (server setter can thoi gian sync)
+    local plateTries = 0
+    while plateTries < 50 do
+        local cur = GetVehicleNumberPlateText(vehicle)
+        if cur and cur:gsub('%s+', '') == plate:gsub('%s+', '') then break end
+        Wait(20)
+        plateTries = plateTries + 1
     end
 
     return vehicle
@@ -87,7 +134,14 @@ if Bridge.Framework.Name == 'qbx' then
     Bridge.Vehicle.SetOwnedState = setOwnedStateGeneric
 
     Bridge.Vehicle.GiveKeys = function(src, vehicle, plate)
-        exports.qbx_vehiclekeys:GiveKeys(src, vehicle)
+        -- Thu toi da 5 lan, kiem tra lai bang HasKeys (neu ban qbx_vehiclekeys co export nay)
+        for _ = 1, 5 do
+            pcall(function() exports.qbx_vehiclekeys:GiveKeys(src, vehicle, true) end)
+            Wait(200)
+            local okCheck, has = pcall(function() return exports.qbx_vehiclekeys:HasKeys(src, vehicle) end)
+            if not okCheck or has then return end -- khong co HasKeys -> coi nhu xong
+        end
+        print(('[s82_vehitems] WARN: khong cap duoc chia khoa cho src=%s plate=%s'):format(src, plate))
     end
 
 -- =====================================================================
@@ -121,6 +175,10 @@ elseif Bridge.Framework.Name == 'qb' then
         -- Chuan qb-vehiclekeys pho bien nhat. Neu ban dung script chia khoa
         -- khac (vd wasabi_carlock), doi lai event nay cho khop.
         TriggerClientEvent('vehiclekeys:client:SetOwner', src, plate)
+        -- Gui lai lan 2 phong truong hop client chua nhan dung bien so o lan dau
+        SetTimeout(1000, function()
+            TriggerClientEvent('vehiclekeys:client:SetOwner', src, plate)
+        end)
     end
 
 -- =====================================================================
