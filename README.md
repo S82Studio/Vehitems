@@ -1,4 +1,4 @@
-# s82_vehitems (S82Studio) — v3.0.0
+# s82_vehitems (S82Studio) — v3.0.1
 
 Script vật phẩm xe đa framework: **ESX / QBCore / QBox**, đa hệ thống túi đồ
 (**ox_inventory / qs-inventory / qb-inventory / ps-inventory / ESX mặc định**),
